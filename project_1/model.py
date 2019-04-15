@@ -8,6 +8,7 @@ import pdb
 
 max_length = 30
 batch_size = 64
+nhidden = 512
 BUFFER_SIZE = 10000
 # make this 0 if you want to process whole dataset, else this is the number of sentences
 SUBSET = 1000
@@ -62,23 +63,23 @@ class LM(object):
         return tf.stack(output, axis=1)
     
     
-def model_step(maxlen = 30):
+def model_step(sentence_batch, maxlen = 30):
     # initialize the rnncell state 
-    rnn_state = tf.zeros([sentence_batch.shape[0], self.rnncell.state_size[0]])
-    rnn_cell_state = tf.zeros([sentence_batch.shape[0], self.rnncell.state_size[0]])
+    rnn_state = tf.zeros([sentence_batch.shape[0], nhidden])
+    rnn_cell_state = tf.zeros([sentence_batch.shape[0], nhidden])
     h = (rnn_state, rnn_cell_state)
     output = []
     # go through the sentence word by word until the second last word (last is <eos>)
     for i in range(maxlen-1):
         # get the embedding vector for each sentence in batch
-        E = [self.word_embeddings[w, :] for w in sentence_batch[:,i]]
+        E = [word_embeddings[w, :] for w in sentence_batch[:,i]]
         E = tf.stack(E, axis = 0)
         
         # map through lstm
-        o, h = self.rnncell(E, h)
+        o, h = rnncell(E, h)
         
         # map output to score over vocabulary
-        output.append(self.linear_out(o))
+        output.append(linear_out(o))
     return tf.stack(output, axis=1)
 
 
