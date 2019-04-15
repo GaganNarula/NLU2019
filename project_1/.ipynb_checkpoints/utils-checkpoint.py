@@ -89,7 +89,7 @@ def processTestDataset(path_to_test, save_to, V):
     # load data 
     data = readLines(path_to_test)
     # preprocess sentences
-    data = [preprocessSentence(sentence, V) for s in data]
+    data = [preprocessSentence(s, V) for s in data]
     data = np.array([d[0] for d in data])
     print('... processed sentences ... ')
     np.save(data, save_to)
