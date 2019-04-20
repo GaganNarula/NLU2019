@@ -93,3 +93,16 @@ def processTestDataset(path_to_test, save_to, V):
     data = np.array([d[0] for d in data])
     print('... processed sentences ... ')
     np.save(save_to, data)
+
+    
+def load_data(subset = 0):
+    with open('./data/'+'training_data.pickle','rb') as f:
+        d = pickle.load(f)
+    data = np.array(d['data'])
+    V = d['vocabulary']
+    del d
+    # random subset 
+    if subset > 0:
+        idx = np.random.choice(len(data), size = subset)
+        data = data[idx]
+    return data, V
