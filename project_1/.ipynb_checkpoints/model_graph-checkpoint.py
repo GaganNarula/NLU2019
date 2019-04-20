@@ -193,4 +193,4 @@ with tf.Session(graph=graph) as session:
             f.write(str(sentence_perplexity[i])+'\n')
 end = time()
 print('\n ... DONE! time taken = %5d secs ...' % (end - start))
-file_writer.close()
+#file_writer.close()
