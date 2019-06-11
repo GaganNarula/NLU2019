@@ -12,6 +12,7 @@ os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
 maxlength = 30
 batch_size = 64
 nhidden = 1024
+do_eval = False
 down_proj_dim = 512
 embedding_size = 100
 vocabsize = 20004
@@ -107,6 +108,7 @@ data_batches,_ = to_batches(data)
 nsampstest = len(test_data)
 test_data_batches, rem = to_batches(test_data, shuffle = False, pad = True)
 
+#test_data_batches.append(data_last)
 
 graph = tf.Graph()
 with graph.as_default():
@@ -129,6 +131,9 @@ with graph.as_default():
                            trainable = True)
         b2 = tf.get_variable(name = 'bias', initializer = tf.zeros(vocabsize), trainable=True)
         
+        
+    #th tf.name_scope("rnn_vars"):
+    #   rnn_state = tf.get_variable()
     with tf.name_scope("prediction"):
         output = model_step(x)
         
@@ -144,9 +149,12 @@ with graph.as_default():
     with tf.name_scope("optimize"):
         optimizer = tf.train.AdamOptimizer()
         grads_and_variables = optimizer.compute_gradients(loss)
+        #grads_and_variables = list(zip(*grads_and_variables))
+        #grads = grads_and_variables[0]
         grads = [g for g,v in grads_and_variables]
         variables = [v for g,v in grads_and_variables]
         clipped_grads = tf.clip_by_global_norm(grads, clip_norm = 5)
+        #print([tf.shape(c) for c in clipped_grads])t
         clipped_grads = clipped_grads[0]
         train_step = optimizer.apply_gradients(zip(clipped_grads, variables))
 
@@ -159,7 +167,7 @@ file_writer = tf.summary.FileWriter(logdir, tf.get_default_graph())
 
 with tf.Session(graph=graph) as session:
     session.run(tf.global_variables_initializer())
-    saver.restore(session, save_path = CHECKPT_PATH + '/model_checkpt/'+'final_model.ckpt')
+    saver.restore(session, save_path = CHECKPT_PATH + '/model_checkpt_B/'+'final_model_B.ckpt')
     # Training loop
     for epoch in range(NEPOCHS):
         train_loss = []
@@ -173,6 +181,22 @@ with tf.Session(graph=graph) as session:
                 
             _, loss_, _ = session.run([train_step, loss, output], feed_dict = {x: sentence, y: labels})
             train_loss.append(loss_)
+            if do_eval and (i % EVAL_EVERY == EVAL_EVERY - 1):
+                print(' ### NOW EVALUATING ###')
+                eval_loss = []
+                # evaluate loss on eval data
+                for j, sentence in enumerate(eval_batches):
+                    labels = sentence[:,1:]
+                    loss_,_ = session.run([loss, output], feed_dict = {x: sentence, y: labels})
+                    eval_loss.append(loss_ * batch_size)
+                print(' ### EVAL LOSS = %f ###'
+                      %(np.sum(np.array(eval_loss)) / nevalsamples))
+                all_eval_losses.append(np.sum(np.array(eval_loss)) / nevalsamples)
+            
+            # early stopping
+            if do_eval and len(all_eval_losses) > 2 and (all_eval_losses[-1] > all_eval_losses[-2]):
+                print(' ....... EARLY STOPPING INITIATED! .......')
+                break
             
             
         # checkpoint model

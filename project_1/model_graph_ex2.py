@@ -42,7 +42,7 @@ start = time()
 _, V = load_data()
 vocabsize = len(V.keys())
 continuation_data = np.load(DATA_PATH + 'continuation_data.npy')
-continuation_data = continuation_data[:1]
+
 
 def to_batches(data, shuffle = True, pad = False):
     nsamps = len(data)
@@ -103,27 +103,9 @@ with graph.as_default():
         # map output to score over vocabulary
         z1 = tf.matmul(o, W1) + b1
         z2 = tf.matmul(z1, W2) + b2
-        #probability = tf.nn.softmax(z2)
         # get index of max
         output = tf.argmax(z2, axis = -1)
         output = tf.squeeze(output)
-    #with tf.name_scope("loss"):
-    #    loss = tf.reduce_mean(tf.nn.sparse_softmax_cross_entropy_with_logits(labels = y,
-    #                                                                         logits = output),
-    #                          name='loss')
-        
-    #with tf.name_scope("optimize"):
-    #    optimizer = tf.train.AdamOptimizer()
-    #    grads_and_variables = optimizer.compute_gradients(loss)
-        #grads_and_variables = list(zip(*grads_and_variables))
-        #grads = grads_and_variables[0]
-    #    grads = [g for g,v in grads_and_variables
-    #    variables = [v for g,v in grads_and_variables]
-    #    clipped_grads = tf.clip_by_global_norm(grads, clip_norm = 5)
-        #print([tf.shape(c) for c in clipped_grads])t
-    #    clipped_grads = clipped_grads[0]
-    #    train_step = optimizer.apply_gradients(zip(clipped_grads, variables))
-
         
     saver = tf.train.Saver()
 
@@ -139,8 +121,8 @@ with tf.Session(graph=graph) as session:
         while not_done:
             if t==0:
                 h, c = session.run([rnn_state, rnn_cell_state], 
-                                   feed_dict={rnn_state: np.zeros((batch_size, nhidden), dtype='float32'),
-                                             rnn_cell_state: np.zeros((batch_size, nhidden), dtype='float32') })
+                                   feed_dict={rnn_state: np.zeros((batch_size, nhidden)),
+                                             rnn_cell_state:np.zeros((batch_size, nhidden)) })
                 
             if batch_sentence[:,t] == V['<pad>'][0]:
                 # use last generated word
@@ -171,7 +153,7 @@ with tf.Session(graph=graph) as session:
         all_generated_sentences.append(out)
         
         if i % LOG_EVERY == LOG_EVERY-1:
-            map(print, out)
+            print(*out, sep = ' ')
         
     with open(CHECKPT_PATH+'ex2_generated.txt', 'w') as f:
         for i in range(len(all_generated_sentences)):

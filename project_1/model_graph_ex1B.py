@@ -18,6 +18,7 @@ SUBSET = 0
 NEPOCHS = 1
 BUFFER_SIZE = 10000
 LOG_EVERY = 200
+do_eval = False
 path2emb = './data/wordembeddings-dim100.word2vec'
 CHECKPT_PATH = '/home/songbird/Desktop/'
 DATA_PATH = './data/'
@@ -78,6 +79,11 @@ start = time()
 # setup the dataset
 data, V = load_data()
 vocabsize = len(V.keys())
+if do_eval:
+    eval_data = np.load(DATA_PATH + 'eval_data.npy')
+    eval_batches,_ = to_batches(eval_data, shuffle = True, pad = False)
+    nevalsamples = len(eval_batches) * batch_size
+
 test_data = np.load(DATA_PATH + 'test_data.npy')
 
 def to_batches(data, shuffle = True, pad = False):
@@ -106,6 +112,8 @@ data_batches,_ = to_batches(data)
 nsampstest = len(test_data)
 test_data_batches, rem = to_batches(test_data, shuffle = False, pad = True)
 
+#test_data_batches.append(data_last)
+
 graph = tf.Graph()
 with graph.as_default():
     with tf.name_scope("inputs"):
@@ -123,6 +131,8 @@ with graph.as_default():
                            trainable = True)
         b = tf.get_variable(name = 'bias', initializer = tf.zeros(vocabsize), trainable=True)
         
+    #th tf.name_scope("rnn_vars"):
+    #   rnn_state = tf.get_variable()
     with tf.name_scope("prediction"):
         output = model_step(x)
         
@@ -138,9 +148,12 @@ with graph.as_default():
     with tf.name_scope("optimize"):
         optimizer = tf.train.AdamOptimizer()
         grads_and_variables = optimizer.compute_gradients(loss)
+        #grads_and_variables = list(zip(*grads_and_variables))
+        #grads = grads_and_variables[0]
         grads = [g for g,v in grads_and_variables]
         variables = [v for g,v in grads_and_variables]
         clipped_grads = tf.clip_by_global_norm(grads, clip_norm = 5)
+        #print([tf.shape(c) for c in clipped_grads])t
         clipped_grads = clipped_grads[0]
         train_step = optimizer.apply_gradients(zip(clipped_grads, variables))
 
@@ -166,10 +179,25 @@ with tf.Session(graph=graph) as session:
                 
             _, loss_, _ = session.run([train_step, loss, output], feed_dict = {x: sentence, y: labels})
             train_loss.append(loss_)
+            if do_eval and (i % EVAL_EVERY == EVAL_EVERY - 1):
+                print(' ### NOW EVALUATING ###')
+                eval_loss = []
+                # evaluate loss on eval data
+                for j, sentence in enumerate(eval_batches):
+                    labels = sentence[:,1:]
+                    loss_,_ = session.run([loss, output], feed_dict = {x: sentence, y: labels})
+                    eval_loss.append(loss_ * batch_size)
+                print(' ### EVAL LOSS = %f ###'
+                      %(np.sum(np.array(eval_loss)) / nevalsamples))
+                all_eval_losses.append(np.sum(np.array(eval_loss)) / nevalsamples)
             
+            # early stopping
+            if do_eval and len(all_eval_losses) > 2 and (all_eval_losses[-1] > all_eval_losses[-2]):
+                print(' ....... EARLY STOPPING INITIATED! .......')
+                break
             
         # checkpoint model
-        save_path = saver.save(session, CHECKPT_PATH + '/model_checkpt/'+'final_model.ckpt')
+        save_path = saver.save(session, CHECKPT_PATH + '/model_checkpt_B/'+'final_model_B.ckpt')
 
 
         # evaluate learned model
